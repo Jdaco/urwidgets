@@ -3,7 +3,7 @@ import sys
 import traceback
 import pyparsing as pp
 class CommandFrame(urwid.Frame):
-    argument = pp.Or((pp.Word(pp.alphanums), pp.QuotedString("'")))
+    argument = pp.Or((pp.Word(pp.printables), pp.QuotedString("'")))
     command = pp.Word(pp.alphas)
     commandLine = command + pp.ZeroOrMore(argument)
     def __init__(self, body=None, header=None, focus_part='body'):
