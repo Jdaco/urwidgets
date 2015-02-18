@@ -2,13 +2,17 @@ import urwid
 import sys
 import traceback
 import pyparsing as pp
+
+
 class CommandFrame(urwid.Frame):
     argument = pp.Or((pp.Word(pp.printables), pp.QuotedString("'")))
     command = pp.Word(pp.alphas)
     commandLine = command + pp.ZeroOrMore(argument)
+
     def __init__(self, body=None, header=None, focus_part='body'):
         self.editing = False
         self.edit = None
+        self.functions = {}
         urwid.Frame.__init__(self, body, header, self.edit, focus_part)
 
     def keypress(self, size, key):
