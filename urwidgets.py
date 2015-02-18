@@ -1,3 +1,4 @@
+#!/usr/bin/python2
 import urwid
 import sys
 import traceback
@@ -39,14 +40,14 @@ class CommandFrame(urwid.Frame):
         try:
             self.functions[function](*arguments)
         except TypeError:
-            #Too many arguments
+            # Too many arguments
             tb = traceback.extract_tb(sys.exc_info()[2])
             if len(tb) == 1:
                 self.changeStatus("Wrong number of arguments")
             else:
                 raise
         except KeyError:
-            #Command not found
+            # Command not found
             tb = traceback.extract_tb(sys.exc_info()[2])
             if len(tb) == 1:
                 self.changeStatus("Command not found")
@@ -64,9 +65,10 @@ class CommandFrame(urwid.Frame):
         self.footer = self.edit
         self.focus_position = "footer"
         self.editing = True
-        
+
     def changeStatus(self, stat):
         self.footer = urwid.AttrMap(urwid.Text(stat), 'item')
+
 
 class List(urwid.ListBox):
     def __init__(self, widgets=[], shiftFunc=None):
@@ -90,4 +92,3 @@ class List(urwid.ListBox):
                     self.shiftFunc(index-1)
         else:
             return key
-
