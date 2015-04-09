@@ -8,6 +8,8 @@ setup_args = dict(
     author_email="chaisecanz@gmail.com",
     url="https://github.com/Jdaco/urwidgets",
     platforms="Platform Independent",
-    py_modules=["urwidgets"] )
+    install_requires=['urwid'],
+    packages=["urwidgets"],
+)
 
 setup(**setup_args)
