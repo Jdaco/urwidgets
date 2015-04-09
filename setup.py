@@ -1,3 +1,4 @@
+#!/usr/bin/python2
 from distutils.core import setup
 
 setup_args = dict(
