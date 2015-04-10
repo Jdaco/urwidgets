@@ -114,7 +114,7 @@ class CommandFrame(urwid.Frame):
                     # Too many arguments
                     tb = traceback.extract_tb(sys.exc_info()[2])
                     if len(tb) == 1:
-                        self.changeStatus("Wrong number of arguments")
+                        self.change_status("Wrong number of arguments")
                     else:
                         raise
 
@@ -298,8 +298,8 @@ class TitledPile(MappedPile):
     def shiftUp(self):
         if self.focus_position > 1:
             super(TitledPile, self).shiftUp()
-        elif self.hitTop is not None:
-            self.hitTop()
+        else:
+            urwid.emit_signal(self, 'top')
 
     def isEmpty(self):
         return len(self.contents) == 1
@@ -318,5 +318,6 @@ class TitledPile(MappedPile):
         self.title = widget
         self.contents[0] = (widget, self.options())
 
+urwid.register_signal(TitledPile, ('shift', 'bottom', 'top'))
 urwid.register_signal(MappedPile, ('shift', 'bottom', 'top'))
 urwid.register_signal(MappedList, ('shift', 'bottom', 'top'))
