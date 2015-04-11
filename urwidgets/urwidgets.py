@@ -128,7 +128,7 @@ class CommandFrame(urwid.Frame):
         self.command_line.set_edit_text(startText)
         self.footer = self.command_line
         self.focus_position = "footer"
-        callback = self.submitCommand if callback is None else callback
+        callback = self.submit_command if callback is None else callback
 
         def complete():
             self.command_line.set_edit_text(
