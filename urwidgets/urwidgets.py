@@ -97,6 +97,34 @@ class CommandFrame(urwid.Frame):
             self.keymap[key]()
         return key
 
+    def areyousure(self, text="Are you sure?", yes=(lambda: None), no=(lambda: None)):
+        def escape():
+            self.footer = self.command_line
+            self.focus_position = 'body'
+
+        def no_func():
+            no()
+            escape()
+
+        def yes_func():
+            yes()
+            escape()
+            
+
+        ays_text = '%s [y/n]' % text
+        widget = MappedWrap(
+            urwid.Text(ays_text),
+            keymap={
+                'esc': no_func,
+                'y': yes_func,
+                'Y': yes_func,
+                'n': no_func,
+                'N': no_func,
+            }
+        )
+        self.footer = widget
+        self.focus_position = 'footer'
+
     def submit_command(self, data):
         try:
             parse_result = shlex.split(data)
