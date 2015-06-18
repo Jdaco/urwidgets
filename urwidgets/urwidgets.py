@@ -126,25 +126,26 @@ class CommandFrame(urwid.Frame):
         self.focus_position = 'footer'
 
     def submit_command(self, data):
-        try:
-            parse_result = shlex.split(data)
-        except ValueError:
-            self.change_status("Invalid command")
-        else:
-            func = parse_result[0]
-            args = parse_result[1:]
-            if func not in self.commands:
-                self.change_status("Command not found")
+        if data is not '':
+            try:
+                parse_result = shlex.split(data)
+            except ValueError:
+                self.change_status("Invalid command")
             else:
-                try:   
-                    self.commands[func](*args)
-                except TypeError:
-                    # Too many arguments
-                    tb = traceback.extract_tb(sys.exc_info()[2])
-                    if len(tb) == 1:
-                        self.change_status("Wrong number of arguments")
-                    else:
-                        raise
+                func = parse_result[0]
+                args = parse_result[1:]
+                if func not in self.commands:
+                    self.change_status("Command not found")
+                else:
+                    try:   
+                        self.commands[func](*args)
+                    except TypeError:
+                        # Too many arguments
+                        tb = traceback.extract_tb(sys.exc_info()[2])
+                        if len(tb) == 1:
+                            self.change_status("Wrong number of arguments")
+                        else:
+                            raise
 
     def stop_editing(self):
         self.command_line.set_caption('')
