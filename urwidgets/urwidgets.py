@@ -8,6 +8,20 @@ import urwid
 import utility
 
 
+class MappedEdit(urwid.Edit):
+    def __init__(self, keymap={}, disabled=False,
+                 *args, **kwargs):
+
+        self.disabled = disabled
+        self.keymap = dict(keymap)
+        super(MappedEdit, self).__init__(*args, **kwargs)
+
+    def keypress(self, size, key):
+        if key in self.keymap:
+            key = self.keymap[key]()
+        if key and not self.disabled:
+            super(MappedEdit, self).keypress(size, key)
+        return key
 class MappedWrap(urwid.AttrMap):
     def __init__(self, widget,
                  attrmap=None, focusmap=None,
@@ -184,7 +198,8 @@ class CommandFrame(urwid.Frame):
 
 class MappedList(urwid.ListBox):
     def __init__(self, body, keymap={}):
-        self.scroll = utility.scroll(range(len(body)))
+        self.scroll = utility.scroll(range(len(body))) \
+            if len(body) != 0 else utility.scroll([0])
         self.keymap = dict(keymap)
         super(MappedList, self).__init__(body)
 
