@@ -4,7 +4,7 @@ def complete(iterable, start_string):
     hits = [
         item[len(start_string):]
         for item in iterable
-        if item[:len(start_string)] == start_string
+        if item[:len(start_string)].lower() == start_string.lower()
     ]
     if len(hits) == 0:
         return start_string
