@@ -204,9 +204,14 @@ class MappedList(urwid.ListBox):
         super(MappedList, self).__init__(body)
 
     def keypress(self, size, key):
-        key = super(MappedList, self).keypress(size, key)
+        if key not in ('up', 'down'):
+            key = super(MappedList, self).keypress(size, key)
         if key in self.keymap:
             key = self.keymap[key]()
+        elif key == 'up':
+            self.shiftUp()
+        elif key == 'down':
+            self.shiftDown()
         return key
 
     def top(self):
