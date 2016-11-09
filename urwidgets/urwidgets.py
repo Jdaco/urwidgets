@@ -2,7 +2,6 @@
 import sys
 import itertools
 import functools
-import traceback
 import shlex
 import urwid
 import utility
@@ -22,6 +21,11 @@ class MappedEdit(urwid.Edit):
         if key and not self.disabled:
             super(MappedEdit, self).keypress(size, key)
         return key
+
+    def start_editing(self):
+        pass
+
+
 class MappedWrap(urwid.AttrMap):
     def __init__(self, widget,
                  attrmap=None, focusmap=None,
@@ -85,15 +89,72 @@ class MappedWrap(urwid.AttrMap):
         return self._widget
 
 
+class CommandFrameController(object):
+    def __init__(self, command_frame, commands):
+        self._frame = command_frame
+        self._commands = dict(commands)
+
+    def areyousure(self, yes, no):
+        def no_func():
+            no()
+            self._frame.escape()
+
+        def yes_func():
+            yes()
+            self._frame.escape()
+
+        return (yes_func, no_func)
+            
+    def submit_command(self, data):
+        if data.strip():
+            try:
+                parse_result = shlex.split(data)
+            except ValueError:
+                self._frame.change_status("Invalid command")
+            else:
+                func = parse_result[0]
+                args = parse_result[1:]
+                if func not in self._commands:
+                    self._frame.change_status("Command not found")
+                else:
+                    try:   
+                        self._commands[func](*args)
+                    except TypeError:
+                        # Too many arguments
+                        self._frame.change_status("Wrong number of arguments")
+
+    def start_editing(self, callback, completion_set):
+        callback = callback or self.submit_command
+
+        def complete():
+            self._frame.command_line_text = utility.complete(
+                completion_set,
+                self._frame.command_line_text
+            )
+            self._frame.command_line_position = len(self._frame.command_line_text)
+
+        def enter_command():
+            t = self._frame.command_line_text
+            self._frame.stop_editing()
+            callback(t)
+
+        def backspace():
+            if self._frame.command_line_text == '':
+                self._frame.stop_editing()
+
+        return (complete, enter_command, backspace)
+
+
 class CommandFrame(urwid.Frame):
-    def __init__(self, body, header=None, focus_part='body'):
-        command_line = urwid.Edit(multiline=False)
-        self.command_line = MappedWrap(command_line)
+    def __init__(self, body, header=None, focus_part='body', commands={}):
+        self.controller = CommandFrameController(self, commands)
 
         if not hasattr(self, 'keymap'):
             self.keymap = {}
-        if not hasattr(self, 'commands'):
-            self.commands = {}
+
+        command_line = urwid.Edit(multiline=False)
+        self.command_line = MappedWrap(command_line)
+
 
         self.keymap[':'] = functools.partial(self.start_editing, callback=self.submit_command)
 
@@ -106,55 +167,33 @@ class CommandFrame(urwid.Frame):
             self.keymap[key]()
         return key
 
+    def escape(self):
+        self.footer = self.command_line
+        self.focus_position = 'body'
+        
     def areyousure(self, text="Are you sure?", yes=(lambda: None), no=(lambda: None)):
-        def escape():
-            self.footer = self.command_line
-            self.focus_position = 'body'
-
-        def no_func():
-            no()
-            escape()
-
-        def yes_func():
-            yes()
-            escape()
-            
+        yes_func, no_func = self.controller.areyousure(yes, no)
 
         ays_text = '%s [y/n]' % text
+
+        maps = {
+            'esc': no_func,
+            'y': yes_func,
+            'Y': yes_func,
+            'n': no_func,
+            'N': no_func,
+        }
+
         widget = MappedWrap(
             urwid.Text(ays_text),
-            keymap={
-                'esc': no_func,
-                'y': yes_func,
-                'Y': yes_func,
-                'n': no_func,
-                'N': no_func,
-            }
+            keymap=maps
         )
+
         self.footer = widget
         self.focus_position = 'footer'
 
     def submit_command(self, data):
-        if data.strip():
-            try:
-                parse_result = shlex.split(data)
-            except ValueError:
-                self.change_status("Invalid command")
-            else:
-                func = parse_result[0]
-                args = parse_result[1:]
-                if func not in self.commands:
-                    self.change_status("Command not found")
-                else:
-                    try:   
-                        self.commands[func](*args)
-                    except TypeError:
-                        # Too many arguments
-                        tb = traceback.extract_tb(sys.exc_info()[2])
-                        if len(tb) == 1:
-                            self.change_status("Wrong number of arguments")
-                        else:
-                            raise
+        self.controller.submit_command(data)
 
     def stop_editing(self):
         self.command_line.set_caption('')
@@ -167,33 +206,33 @@ class CommandFrame(urwid.Frame):
         self.command_line.edit_pos = len(startText)
         self.footer = self.command_line
         self.focus_position = "footer"
-        callback = self.submit_command if callback is None else callback
 
-        def complete():
-            self.command_line.set_edit_text(
-                utility.complete(
-                    completion_set,
-                    self.command_line.get_edit_text()
-                )
-            )
-            self.command_line.edit_pos = len(self.command_line.edit_text)
+        complete, enter, backspace = self.controller.start_editing(callback, completion_set)
 
-        def enter_command():
-            t = self.command_line.edit_text
-            self.stop_editing()
-            callback(t)
-
-        def backspace():
-            if self.command_line.edit_text == '':
-                self.stop_editing()
 
         self.command_line.keymap['esc'] = self.stop_editing
-        self.command_line.keymap['enter'] = enter_command
+        self.command_line.keymap['enter'] = enter
         self.command_line.keymap['tab'] = complete
         self.command_line.keymap['backspace'] = backspace
         
     def change_status(self, stat):
         self.footer = urwid.Text(stat)
+
+    @property
+    def command_line_text(self):
+        return self.command_line.edit_text
+
+    @command_line_text.setter
+    def command_line_text(self, value):
+        self.command_line.set_edit_text(value)
+
+    @property
+    def command_line_position(self):
+        return self.command_line.edit_pos
+
+    @command_line_position.setter
+    def command_line_position(self, value):
+        self.command_line.edit_pos = value
 
 
 class MappedList(urwid.ListBox):
