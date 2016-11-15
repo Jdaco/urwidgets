@@ -145,12 +145,22 @@ class CommandFrameController(object):
 
     def start_editing(self, callback, completion_set):
         callback = callback or self.submit_command
+        tab_through = {}
+
+        def tab(widget, text):
+            tab_through.clear()
 
         def complete():
-            self._frame.command_line_text = utility.complete(
-                completion_set,
-                self._frame.command_line_text
-            )
+            if not tab_through:
+                text, hits = utility.complete(
+                    completion_set,
+                    self._frame.command_line_text
+                )
+                tab_through[text] = itertools.cycle(hits)
+            else:
+                text = tab_through.values()[0].next()
+
+            self._frame.command_line_text = text
             self._frame.command_line_position = len(self._frame.command_line_text)
 
         def enter_command():
@@ -159,10 +169,11 @@ class CommandFrameController(object):
             callback(t)
 
         def backspace():
+            tab_through.clear()
             if self._frame.command_line_text == '':
                 self._frame.stop_editing()
 
-        return (complete, enter_command, backspace)
+        return (tab, complete, enter_command, backspace)
 
 
 class CommandFrame(urwid.Frame):
@@ -227,12 +238,16 @@ class CommandFrame(urwid.Frame):
         self.footer = self.command_line
         self.focus_position = "footer"
 
-        complete, enter, backspace = self.__controller.start_editing(callback, completion_set)
+        tab, complete, enter, backspace = self.controller.start_editing(callback, completion_set)
+        def wrapped_complete():
+            urwid.disconnect_signal(self.command_line, 'change', tab)
+            complete()
+            urwid.connect_signal(self.command_line, 'change', tab)
 
-
+        urwid.connect_signal(self.command_line, 'change', tab)
         self.command_line.keymap['esc'] = self.stop_editing
         self.command_line.keymap['enter'] = enter
-        self.command_line.keymap['tab'] = complete
+        self.command_line.keymap['tab'] = wrapped_complete
         self.command_line.keymap['backspace'] = backspace
         
     def change_status(self, stat):
