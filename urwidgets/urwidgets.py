@@ -5,8 +5,28 @@ import functools
 import shlex
 import urwid
 import utility
+from functools import partial
 
 
+def search(iterable, predicate, key=(lambda x: x)):
+    for item in iterable:
+        if predicate(
+            key( item )
+        ):
+            return item
+    return None
+
+def shift_iterable(iterable, offset, direction):
+    if direction == 'forward':
+        return itertools.islice(
+            itertools.cycle(iterable), offset, offset + len(iterable)
+        )
+    else:
+        new_offset = len(iterable) - offset - 1
+        return itertools.islice(
+            itertools.cycle(reversed(iterable)), new_offset, new_offset + len(iterable)
+        )
+    
 class MappedEdit(urwid.Edit):
     def __init__(self, keymap={}, disabled=False,
                  *args, **kwargs):
@@ -147,7 +167,7 @@ class CommandFrameController(object):
 
 class CommandFrame(urwid.Frame):
     def __init__(self, body, header=None, focus_part='body', commands={}):
-        self.controller = CommandFrameController(self, commands)
+        self.__controller = CommandFrameController(self, commands)
 
         if not hasattr(self, 'keymap'):
             self.keymap = {}
@@ -172,7 +192,7 @@ class CommandFrame(urwid.Frame):
         self.focus_position = 'body'
         
     def areyousure(self, text="Are you sure?", yes=(lambda: None), no=(lambda: None)):
-        yes_func, no_func = self.controller.areyousure(yes, no)
+        yes_func, no_func = self.__controller.areyousure(yes, no)
 
         ays_text = '%s [y/n]' % text
 
@@ -193,7 +213,7 @@ class CommandFrame(urwid.Frame):
         self.focus_position = 'footer'
 
     def submit_command(self, data):
-        self.controller.submit_command(data)
+        self.__controller.submit_command(data)
 
     def stop_editing(self):
         self.command_line.set_caption('')
@@ -207,7 +227,7 @@ class CommandFrame(urwid.Frame):
         self.footer = self.command_line
         self.focus_position = "footer"
 
-        complete, enter, backspace = self.controller.start_editing(callback, completion_set)
+        complete, enter, backspace = self.__controller.start_editing(callback, completion_set)
 
 
         self.command_line.keymap['esc'] = self.stop_editing
@@ -240,6 +260,12 @@ class MappedList(urwid.ListBox):
         self.scroll = utility.scroll(range(len(body))) \
             if len(body) != 0 else utility.scroll([0])
         self.keymap = dict(keymap)
+
+        self.search_anchor = None
+
+        self._searcher = search
+        self._builder = shift_iterable
+
         super(MappedList, self).__init__(body)
 
     def keypress(self, size, key):
@@ -290,14 +316,97 @@ class MappedList(urwid.ListBox):
         self.scroll = utility.scroll(range(len(self.body[:])), position)
         urwid.emit_signal(self, 'shift')
 
-    def find(self, predicate, start=0, direction='forward'):
-        total = len(self.body)
-        indexes = xrange(start - total + 1, start + 1, 1) if direction == 'forward' \
-            else xrange(start - 1, start - total, -1)
-        for index in indexes:
-            if predicate(self.body[index]):
-                return index if index >= 0 else total + index
-        return -1
+    def inc_search(self, predicate, direction, key=(lambda x: x)):
+        start = self.search_anchor if self.search_anchor is not None else self.focus_position
+        self.search_anchor = start
+
+        # Selects the item from the enumerable
+        wrapped_key = lambda x: key( x[1] )
+        iterable = shift_iterable(
+            tuple(enumerate(self.body[:])), 
+            start, direction
+        )
+
+        rtrn = search(
+            iterable,
+            predicate,
+            key=wrapped_key
+        )
+        if rtrn is None:
+            self.set_focus(start)
+        else:
+            index, item = rtrn
+            self.set_focus(index)
+    
+    def _search(self, iterable):
+        return self._searcher(
+            iterable,
+        )
+
+        
+    def search(self, predicate, direction, start=None, key=(lambda x: x)):
+
+        self.search_anchor = None
+        search_start = self.focus_position if start is None else start
+
+        wrapped_key = lambda x: key( x[1] )
+
+        iterable = shift_iterable(
+            tuple(enumerate(self.body[:])), 
+            search_start,
+            direction,
+        )
+
+        # start = self.focus_position if start is 
+        self._searcher = partial(
+            search,
+            predicate=predicate,
+            key=wrapped_key
+        )
+
+        self._builder = partial(
+            shift_iterable,
+            direction=direction
+        )
+
+        rtrn = self._search(iterable)
+
+        if rtrn is None:
+            return None
+        else:
+            # Return the index of the enumerate
+            return rtrn[0]
+
+
+    def next(self):
+        current_position = self.focus_position + 1
+
+        iterable = self._builder(
+            tuple(enumerate(self.body[:])),
+            current_position
+        )
+
+        rtrn = self._search(
+            iterable
+        )
+
+        if rtrn is not None:
+            self.set_focus(rtrn[0])
+    
+    def prev(self):
+        current_position = len(self.body[:]) - self.focus_position 
+
+        iterable = self._builder(
+            tuple(reversed(tuple(enumerate(self.body[:])))),
+            current_position, 
+        )
+
+        rtrn = self._search(
+            iterable
+        )
+
+        if rtrn is not None:
+            self.set_focus(rtrn[0])
 
     def isEmpty(self):
         return len(self.body[:]) == 0
