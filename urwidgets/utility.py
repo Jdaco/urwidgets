@@ -7,15 +7,16 @@ def complete(iterable, start_string):
         if item[:len(start_string)].lower() == start_string.lower()
     ]
     if len(hits) == 0:
-        return start_string
+        return (start_string, tuple())
     else:
-        return start_string + ''.join([
+        most_common_string =  start_string + ''.join([
             char[0] for char in
             itertools.takewhile(
                 lambda x: len(set(x)) == 1,
                 itertools.izip(*hits)
             )
         ])
+        return (most_common_string, tuple(sorted(map(lambda x: start_string + x, hits))))
 
 def renumerate(iterable):
     return (
